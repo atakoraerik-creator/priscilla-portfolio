@@ -4,13 +4,16 @@
   "version": "1.0.0",
   "type": "module",
   "description": "Portfolio and digital shop for Priscilla Adubia Asamoah — Pastry Chef, Cake Artist & Dessert Specialist",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "concurrently -k \"npm:dev:server\" \"npm:dev:web\"",
     "dev:web": "vite",
     "dev:server": "nodemon --watch server --watch .env server/index.mjs",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "cross-env NODE_ENV=production node server/index.mjs",
+    "start": "node server/index.mjs",
     "server": "node server/index.mjs"
   },
   "dependencies": {
@@ -27,7 +30,6 @@
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
     "concurrently": "^9.1.0",
-    "cross-env": "^7.0.3",
     "nodemon": "^3.1.9",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",

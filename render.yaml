@@ -1,0 +1,38 @@
+# Render Blueprint — one-click service creation
+# Docs: https://render.com/docs/blueprint-spec
+# Create the service via:
+#   dashboard.render.com -> New -> Blueprint -> select this repo
+# Then fill in the secret env vars in the service settings (marked
+# with `sync: false` — they are NOT stored in this file on purpose).
+
+services:
+  - type: web
+    name: priscilla-portfolio
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    # Health check against the API so Render knows the app is ready.
+    healthCheckPath: /api/health
+    headers:
+      - path: /images/*
+        name: Cache-Control
+        value: "public, max-age=86400"
+    envVars:
+      # Used by Vite at BUILD time AND served to the browser.
+      # Put your Paystack PUBLIC key here (pk_test_... / pk_live_...).
+      - key: VITE_PAYSTACK_PUBLIC_KEY
+        sync: false
+      # Server only. Never exposed to the browser.
+      - key: PAYSTACK_SECRET_KEY
+        sync: false
+      # Optional signing key for download tokens (defaults to SECRET key).
+      - key: DOWNLOAD_SECRET
+        sync: false
+      # Download-token lifetime in seconds.
+      - key: DOWNLOAD_TOKEN_TTL
+        value: "3600"
+      # Set a URL here only if frontend & API are ever hosted separately.
+      - key: ALLOWED_ORIGINS
+        value: ""
