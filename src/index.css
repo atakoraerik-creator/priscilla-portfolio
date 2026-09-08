@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-ivory-50 text-charcoal font-sans antialiased;
+  }
+
+  ::selection {
+    @apply bg-gold-400 text-chocolate-900;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-gold-500;
+  }
+}
+
+@layer components {
+  .container-content {
+    @apply mx-auto w-full max-w-content px-6 sm:px-8 lg:px-10;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-7 py-3 text-xs font-semibold uppercase tracking-[0.16em] transition-all duration-300;
+  }
+
+  .btn-dark {
+    @apply btn bg-chocolate-700 text-ivory-50 hover:bg-chocolate-800 hover:shadow-card;
+  }
+
+  .btn-gold {
+    @apply btn bg-gold-500 text-chocolate-900 hover:bg-gold-400 hover:shadow-card;
+  }
+
+  .btn-ivory {
+    @apply btn bg-ivory-50 text-chocolate-800 hover:bg-white hover:shadow-card;
+  }
+
+  .btn-outline {
+    @apply btn border border-chocolate-500/60 text-chocolate-700 hover:border-chocolate-700 hover:bg-chocolate-700 hover:text-ivory-50;
+  }
+
+  .btn-outline-light {
+    @apply btn border border-ivory-50/40 text-ivory-50 hover:border-gold-400 hover:text-gold-300;
+  }
+
+  .eyebrow {
+    @apply text-[11px] uppercase tracking-[0.32em] text-gold-600 font-semibold;
+  }
+
+  .eyebrow-light {
+    @apply eyebrow text-gold-300;
+  }
+
+  .h-display {
+    @apply font-serif text-4xl leading-[1.08] text-chocolate-800 sm:text-5xl lg:text-6xl;
+  }
+
+  .card {
+    @apply overflow-hidden rounded-2xl bg-white shadow-card ring-1 ring-chocolate-500/5;
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-chocolate-300/60 bg-white px-4 py-3 text-sm text-chocolate-900 placeholder:text-chocolate-300/70 focus:border-gold-500 focus:outline-none focus:ring-2 focus:ring-gold-400/30;
+  }
+}
+
+/* Subtle grain/paper feel on light sections */
+.paper-texture {
+  background-image: radial-gradient(
+      rgba(107, 68, 35, 0.05) 1px,
+      transparent 1px
+    );
+  background-size: 22px 22px;
+}
