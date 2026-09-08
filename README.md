@@ -51,17 +51,23 @@ npm run build   # builds the frontend into dist/
 npm start       # Express serves dist/ + the API on PORT (default 8787)
 ```
 
-### Production on a VPS / Render / Railway / Fly.io
+### Production on Vercel
 
-Same thing:
+This repo deploys to **Vercel** (frontend + serverless API) — see **`DEPLOY.md`**
+for the step-by-step guide. In short:
+
+- Vercel builds the site and runs `/api` through serverless functions
+  (`api/` folder) that share the same logic as the Express server (`lib/`).
+- The PDFs are stored in **Vercel Blob** (private) — upload them with
+  `npm run books:upload`.
+
+To run the static+server bundle on any Node host instead (VPS, Railway, etc.):
 
 ```bash
 npm install
 npm run build
-npm start
+npm start                  # Express serves dist/ + the API on PORT (default 8787)
 ```
-
-On **Render** create a **Web Service** with start command `npm start` and add the env vars below. On **Vercel/Netlify**, deploy the Express app as a serverless function instead — point the API routes at your function and keep the frontend static.
 
 ---
 
@@ -76,6 +82,7 @@ Copy `.env.example` → `.env` and fill in:
 | `PORT` | server | No (default `8787`) |
 | `DOWNLOAD_SECRET` | server | No (defaults to SECRET key) |
 | `DOWNLOAD_TOKEN_TTL` | server | No (default `3600` seconds) |
+| `BLOB_READ_WRITE_TOKEN` | storage (Vercel Blob) | Only if using Blob |
 | `PRIVATE_STORAGE_URL` | server | Only if PDFs are remote |
 | `PRIVATE_STORAGE_KEY` | server | Only for remote storage auth |
 | `ALLOWED_ORIGINS` | server CORS | Only if frontend & API are on different hosts |
