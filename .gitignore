@@ -3,7 +3,8 @@ node_modules/
 
 # Raw source photography (original files are large; processed
 # images live in public/images/. Keep the originals out of git.)
-IMAGES/
+# NOTE: anchored to the repo root — must NOT ignore public/images/.
+/IMAGES/
 
 # Build output
 dist/
