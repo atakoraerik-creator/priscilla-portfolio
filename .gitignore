@@ -10,6 +10,9 @@ node_modules/
 dist/
 dist-ssr/
 
+# Local order store (contains customer emails — never commit)
+data/
+
 # Environment — NEVER commit real keys
 .env
 .env.local

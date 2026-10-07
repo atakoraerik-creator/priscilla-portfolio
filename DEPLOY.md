@@ -4,8 +4,9 @@ This repo deploys to Vercel as:
 
 - **Static frontend** — the Vite build (`dist/`), with an SPA fallback
   (`vercel.json`) so deep links like `/shop/books/cake-pastry` work.
-- **Serverless functions** — the Paystack verification + secure downloads,
-  ported from Express into `api/` (same logic, shared `/lib`).
+- **Serverless functions** — server-side Paystack payments (initialize,
+  verify, signed webhook) + secure downloads, ported from Express into
+  `api/` (same logic, shared `/lib`).
 - **Private storage** — the PDFs live in **Vercel Blob**, never in the web
   bundle.
 
@@ -66,6 +67,8 @@ Project → **Settings → Environment Variables** (add to *Production*):
 | `BLOB_READ_WRITE_TOKEN` | from Step 3 |
 | `DOWNLOAD_SECRET` | any long random string (fallback signing key) |
 | `DOWNLOAD_TOKEN_TTL` | `3600` |
+| `UPSTASH_REDIS_REST_URL` | (recommended) from Vercel Storage → Upstash |
+| `UPSTASH_REDIS_REST_TOKEN` | (recommended) from Vercel Storage → Upstash |
 
 Then **Redeploy** (Deployments → latest → ⋯ → Redeploy) so the new variables
 take effect. Keys come from **dashboard.paystack.com → Settings → API Keys**.
@@ -75,11 +78,27 @@ take effect. Keys come from **dashboard.paystack.com → Settings → API Keys**
 ## Step 5 — Test everything
 
 - `/api/health` → `{"ok":true,...}`
+- `POST /api/payment/initialize` with `{"productId":"cake-pastry","customerEmail":"you@example.com"}`
+  → `{ ok:true, checkout:{ reference, authorization_url } }`. With no
+  `PAYSTACK_SECRET_KEY` you get a friendly `503` instead (payments are simply
+  not configured yet).
 - Buy a book in the shop with Paystack **test cards**
   (e.g. `4084 0840 8408 4081`, future expiry, CVV `408`):
-  - Payment success page downloads the PDF, which is streamed from **Blob**.
+  - You are redirected to Paystack Checkout and land back on
+    `/payment-success`; the server re-verifies via `GET /api/payment/verify/:reference`
+    and only then issues a download link streamed from **Blob**.
   - `/api/download/garbage` → **401**, never a file.
 - Deep links work: type `/creations` directly in the URL bar.
+
+## Step 6 — Webhook (optional, recommended)
+
+1. Paystack → **Settings → API Keys & Webhooks** → Webhook URL:
+   `https://<your-domain>/api/paystack/webhook`
+2. Signatures (`x-paystack-signature`, HMAC-SHA512 over the raw body) are
+   verified with `PAYSTACK_SECRET_KEY` — tampered requests get `401` and
+   `charge.success` marks the matching order `PAID` idempotently.
+3. The verify step on the success page remains the primary fulfilment gate,
+   so the webhook is not required to sell books.
 
 ---
 
@@ -89,7 +108,8 @@ take effect. Keys come from **dashboard.paystack.com → Settings → API Keys**
    `server/private/books/`, then re-run `npm run books:upload`.
 2. In Paystack, go **Live** (add your `*.vercel.app` domain) and update both
    keys in Vercel.
-3. (Recommended) Add a Paystack **webhook** to `/api/paystack/verify` later.
+3. (Recommended) Keep the Paystack **webhook** to
+   `/api/paystack/webhook` (see Step 6).
 
 ## Custom domain (optional)
 

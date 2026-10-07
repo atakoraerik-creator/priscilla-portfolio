@@ -3,7 +3,7 @@ import Seo from '../components/Seo';
 
 export default function PaymentFailed() {
   const [params] = useSearchParams();
-  const productId = params.get('product');
+  const reference = params.get('reference') || params.get('trxref');
 
   return (
     <>
@@ -40,10 +40,12 @@ export default function PaymentFailed() {
             </Link>
           </div>
 
-          <p className="mt-8 text-xs text-charcoal/45">
-            Any transaction with {productId && <span className="font-medium">reference</span>}{' '}
-            shown in your Paystack receipt was not completed.
-          </p>
+          {reference && (
+            <p className="mt-8 text-xs text-charcoal/45">
+              Reference: <span className="font-medium">{reference}</span> — this
+              transaction was not completed.
+            </p>
+          )}
         </div>
       </section>
     </>

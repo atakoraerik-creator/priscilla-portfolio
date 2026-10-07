@@ -1,27 +1,29 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { payForProduct, PAYSTACK_KEY_CONFIGURED } from '../services/paystack';
+import { initializePayment } from '../api/client';
+import { PAYSTACK_KEY_CONFIGURED } from '../services/paystack';
+import { savePendingCheckout } from '../services/checkout';
 import LoadingSpinner from './LoadingSpinner';
 import ErrorMessage from './ErrorMessage';
 
 /**
- * The complete "one-click to payment" experience.
- * Collects the email Paystack requires, opens the popup and then
- * redirects to /payment-success (with state) or /payment-failed.
+ * "Buy Now" → checkout form (name + email) → server-initialized
+ * Paystack transaction → redirect to Paystack hosted checkout.
  *
- * Nothing is granted client-side — the success page re-verifies
- * the transaction on the server before enabling any download.
+ * Nothing is granted client-side: on return, the success page calls
+ * the server again, which re-verifies with Paystack before any
+ * download link is produced.
  */
 export default function PaymentButton({
   product,
   className = 'btn-gold',
   label = 'Buy Now',
 }) {
-  const [step, setStep] = useState('idle'); // idle | email | paying | error
+  const [step, setStep] = useState('idle'); // idle | form | paying | error
   const [error, setError] = useState('');
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const navigate = useNavigate();
+  const [busy, setBusy] = useState(false);
 
   const openCheckout = () => {
     setError('');
@@ -32,27 +34,38 @@ export default function PaymentButton({
       );
       return;
     }
-    setStep('email');
+    setStep('form');
   };
 
-  const handleEmailSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (busy) return; // block double clicks
+    const trimmedEmail = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setStep('error');
+      setError('Please enter a valid email address.');
+      return;
+    }
+
     setError('');
+    setBusy(true);
     setStep('paying');
     try {
-      const result = await payForProduct({
-        product,
-        customerEmail: email,
+      const callbackUrl = `${window.location.origin}/payment-success`;
+      const data = await initializePayment({
+        productId: product.id,
+        customerName: name.trim(),
+        customerEmail: trimmedEmail,
+        callbackUrl,
       });
-      navigate(
-        `/payment-success?ref=${encodeURIComponent(result.reference)}&product=${encodeURIComponent(
-          result.productId
-        )}&email=${encodeURIComponent(email)}`,
-        { replace: true }
-      );
+      // Remember what we started so the success page can restore context.
+      savePendingCheckout({ reference: data.checkout.reference, productId: product.id });
+      // Redirect to Paystack hosted checkout.
+      window.location.assign(data.checkout.authorization_url);
     } catch (err) {
+      setBusy(false);
       setStep('error');
-      setError(err.message || 'Payment could not be completed.');
+      setError(err.message || 'Payment could not be started. Please try again.');
     }
   };
 
@@ -64,14 +77,20 @@ export default function PaymentButton({
 
   return (
     <>
-      <button type="button" onClick={openCheckout} className={className}>
+      <button
+        type="button"
+        onClick={openCheckout}
+        disabled={busy}
+        className={className}
+        aria-busy={busy}
+      >
         {label}
       </button>
 
       <AnimatePresence>
-        {step === 'email' && (
+        {step === 'form' && (
           <ModalShell onClose={closeModal} label="Checkout">
-            <form onSubmit={handleEmailSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-5">
               <div>
                 <h3 className="font-serif text-2xl text-chocolate-800">
                   {product.title}
@@ -80,6 +99,21 @@ export default function PaymentButton({
                   {Number(product.price).toFixed(2)} {product.currency} · Digital
                   PDF · Secure checkout by Paystack
                 </p>
+              </div>
+
+              <div>
+                <label htmlFor="checkout-name" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-chocolate-700">
+                  Full name
+                </label>
+                <input
+                  id="checkout-name"
+                  type="text"
+                  autoComplete="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Your name"
+                  className="input"
+                />
               </div>
 
               <div>
@@ -126,7 +160,7 @@ export default function PaymentButton({
 
         {step === 'error' && (
           <ModalShell onClose={closeModal} label="Payment error">
-            <ErrorMessage title="Payment could not be completed" message={error} />
+            <ErrorMessage title="Payment could not be started" message={error} />
             <div className="mt-5 flex justify-end gap-3">
               <button
                 type="button"

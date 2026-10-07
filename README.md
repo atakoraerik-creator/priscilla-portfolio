@@ -96,43 +96,80 @@ Copy `.env.example` → `.env` and fill in:
 
 ---
 
-## How the shop & secure download work
+## How the shop & secure downloads work
 
 ```
 / Shop → product details → BUY NOW
-   → email prompt → Paystack popup (public key, amount in minor units)
-   → payment success → /payment-success?ref=…&product=…
-   → frontend calls POST /api/paystack/verify
-   → server verifies with Paystack (SECRET key) and checks:
-       1. reference exists             
-       2. status === success           
-       3. product exists in products.js
-       4. amount matches product.price (×100)
-       5. currency matches
-       6. metadata product matches
-   → only then server signs a short-lived download token (HMAC, expires)
+   → checkout form (name + email)
+   → POST /api/payment/initialize          (server-side, before the customer ever sees Paystack)
+        1. server validates the product against src/data/products.js
+        2. server computes the amount in minor units (GHS 25.00 → 2500 pesewas)
+        3. server creates a unique reference (PKT-…)
+        4. server calls Paystack transaction/initialize with the SECRET key
+        5. server stores a PENDING order
+        6. returns the Paystack authorization_url
+   → browser redirects the customer to Paystack Checkout (hosted, PCI-safe)
+   → customer pays → Paystack redirects back to /payment-success?trxref=…
+   → GET /api/payment/verify/:reference   (server-side, NEVER trusts the frontend)
+        1. server re-verifies the reference directly with Paystack (SECRET key)
+        2. checks status === success
+        3. checks the amount matches the stored order (server-computed)
+        4. checks the currency matches
+        5. checks the transaction metadata product matches
+        6. marks the order PAID (idempotent — cannot be re-marked or duplicated)
+   → only then issues a short-lived HMAC-signed download token
    → GET /api/download/<token> streams the PDF  (token expires, cannot be forged)
 ```
 
-**Nothing is ever granted based on the frontend claiming success.** The success page only enables the download button after the server confirms with Paystack.
+**Nothing is ever granted based on the frontend claiming success.** The success
+page only enables the download button after the server confirms with Paystack.
 
-The download token is signed with HMAC-SHA256 and expires after `DOWNLOAD_TOKEN_TTL` seconds. A customer can never edit a URL to download a different product, and the browser never learns the storage location.
+### Payment statuses & idempotency
 
----
+Orders live in a tiny key/value store (see *Order store* below) with statuses:
 
-## Paystack configuration
+| Status | Meaning |
+|---|---|
+| `PENDING` | checkout initialized, awaiting payment |
+| `PAID` | Paystack confirmed the charge (matches amount/currency/product) |
+| `FAILED` | verification found the transaction missing/aborted/is mismatched |
+| `CANCELLED` | reserved for future flows (Paystack cancel path) |
 
-1. Register at https://paystack.com and create an integration.
-2. Copy the **Test** keys:
-   - Public key `pk_test_…` → `VITE_PAYSTACK_PUBLIC_KEY`
-   - Secret key `sk_test_…` → `PAYSTACK_SECRET_KEY` (server only)
-3. Test the full flow with Paystack test cards:
-   - **Success:** card `4084 0840 8408 4081`, any future expiry, CVV `408`, any PIN
-   - **Failure:** card `4084 0840 8408 4082`
-4. When ready for real money, flip Paystack to **Live** in the dashboard and update both keys (the same `.env` works — just swap the values).
-5. (Recommended, later) Configure a **Paystack webhook** and your business *settlement/auto-delivery* settings.
+- Re-verifying the same reference returns the same result — an order can only
+  ever move forward toward `PAID` once, so a customer can never be granted the
+  product a second time, and webhook/verifier retries can't double-approve.
+- A re-issued download token for an already-`PAID` reference is safe because it
+  is short-lived and re-verified each time.
 
-> GHS amounts are passed to Paystack in **minor units (pesewas)** automatically by the frontend (`src/services/paystack.js`).
+### Webhook
+
+Optionally, Paystack can push confirmed charges to
+**`POST /api/paystack/webhook`**:
+
+1. Configure the URL in Paystack → Settings → API Keys & Webhooks → Webhook URL:
+   `https://<your-domain>/api/paystack/webhook`
+2. Every request's `x-paystack-signature` header is verified with
+   **HMAC-SHA512 of the raw body** using `PAYSTACK_SECRET_KEY` before it is
+   trusted (any mismatch → `401`).
+3. `charge.success` marks the matching order `PAID` — idempotently, so Paystack
+   retries never create duplicates.
+4. The webhook is *not required* to sell books: the verify endpoint on the
+   success page is the primary fulfilment gate.
+
+### Order store (why there is no database)
+
+This project stays database-free by design. Orders are persisted through the
+simplest backend that is available:
+
+- **Local dev** → JSON file at `./data/orders.json` (auto-gitignored).
+- **On Vercel** → in-memory per server instance **unless you add Upstash Redis**
+  (recommended for production). Vercel → Storage → Create → **Upstash**, then set
+  `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`.
+
+For high-volume production, swap `lib/orders.js` for a real database (Postgres
+via `@vercel/postgres`, Supabase, etc.) — the rest of the code already treats
+`saveOrder` / `getOrder` / `updateOrderStatus` as the only database touchpoints.
+No card data is ever stored (Paystack retains it; we only keep the reference).
 
 ---
 

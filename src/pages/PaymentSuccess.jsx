@@ -31,15 +31,15 @@ export default function PaymentSuccess() {
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState('');
 
-  const reference = params.get('ref');
-  const productId = params.get('product');
+  // Paystack appends ?trxref & ?reference to the callback_url after payment.
+  const reference = params.get('reference') || params.get('trxref');
 
   useEffect(() => {
     const stored = readStoredPurchase();
 
     // No reference at all
-    if (!reference || !productId) {
-      if (stored && stored.status === 'verified' && stored.reference) {
+    if (!reference) {
+      if (stored && stored.status === 'verified') {
         setState(stored);
         return;
       }
@@ -55,14 +55,16 @@ export default function PaymentSuccess() {
 
     setVerifying(true);
     setError('');
-    verifyPayment({ reference, productId })
+    verifyPayment(reference)
       .then((data) => {
-        if (data && data.verified && data.token && data.product) {
+        if (data && data.verified && data.token && data.product && data.order) {
           const purchase = {
             status: 'verified',
-            reference,
-            productId,
+            reference: data.order.reference || reference,
+            productId: data.product.id,
             product: data.product,
+            amount: data.order.amount,
+            currency: data.order.currency,
             token: data.token,
           };
           writeStoredPurchase(purchase);
@@ -80,7 +82,7 @@ export default function PaymentSuccess() {
         setError(err.message || 'Payment verification failed. Please try again.');
       })
       .finally(() => setVerifying(false));
-  }, [reference, productId]);
+  }, [reference]);
 
   return (
     <>
@@ -139,8 +141,8 @@ export default function PaymentSuccess() {
                     </dt>
                     <dd className="mt-1 font-serif text-lg text-gold-600">
                       {formatMoney(
-                        Math.round(state.product.price * 100),
-                        state.product.currency
+                        typeof state.amount === 'number' ? state.amount : Math.round(state.product.price * 100),
+                        state.currency || state.product.currency
                       )}
                     </dd>
                   </div>
