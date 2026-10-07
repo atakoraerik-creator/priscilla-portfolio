@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { initializePayment } from '../api/client';
-import { PAYSTACK_KEY_CONFIGURED } from '../services/paystack';
 import { savePendingCheckout } from '../services/checkout';
 import LoadingSpinner from './LoadingSpinner';
 import ErrorMessage from './ErrorMessage';
@@ -27,13 +26,6 @@ export default function PaymentButton({
 
   const openCheckout = () => {
     setError('');
-    if (!PAYSTACK_KEY_CONFIGURED) {
-      setStep('error');
-      setError(
-        'Payments are not configured yet. Set VITE_PAYSTACK_PUBLIC_KEY, then try again.'
-      );
-      return;
-    }
     setStep('form');
   };
 
